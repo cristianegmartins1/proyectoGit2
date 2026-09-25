@@ -1,0 +1,65 @@
+name: CD
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Incrementar versión
+        shell: bash
+        run: |
+          CURRENT_VERSION=$(grep -oP 'AppVersion-\K[0-9]+' README.md | tail -1)
+
+          if [ -z "$CURRENT_VERSION" ]; then
+            CURRENT_VERSION=0
+          fi
+
+          NEW_VERSION=$((CURRENT_VERSION + 1))
+          DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+          sed -i "s/AppVersion-${CURRENT_VERSION}/AppVersion-${NEW_VERSION}/" README.md
+
+          echo "AppVersion-${NEW_VERSION} - ${DATE}" >> README.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add README.md
+          git commit -m "chore: incrementar versión a AppVersion-${NEW_VERSION}" || echo "No hay cambios que committear"
+          git push
+
+  validate-prod:
+    runs-on: self-hosted
+    needs: update-version
+
+    steps:
+      - name: Validar PROD_TOKEN
+        shell: powershell
+        env:
+          PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
+          LOCAL_PROD_TOKEN: ${{ vars.LOCAL_PROD_TOKEN }}
+        run: |
+          Write-Host "Validando PROD_TOKEN..."
+
+          if ($env:PROD_TOKEN -eq $env:LOCAL_PROD_TOKEN) {
+            Write-Host "PROD_TOKEN válido"
+          }
+          else {
+            Write-Error "PROD_TOKEN no coincide con LOCAL_PROD_TOKEN"
+            exit 1
+          }

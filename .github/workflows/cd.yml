@@ -41,7 +41,7 @@ jobs:
 
           git add README.md
           git commit -m "chore: incrementar versión a AppVersion-${NEW_VERSION}" || echo "No hay cambios que committear"
-          git push
+          git push origin HEAD:main
 
   validate-prod:
     runs-on: self-hosted
